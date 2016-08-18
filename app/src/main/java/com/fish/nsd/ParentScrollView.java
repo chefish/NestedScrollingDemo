@@ -7,6 +7,7 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.ViewGroup;
 import android.widget.Button;
 
 /**
@@ -59,33 +60,31 @@ public class ParentScrollView extends MyNestedScrollView {
 
         if (consumeAll && ev.getAction() == MotionEvent.ACTION_UP) {
 
-            if (childView instanceof ChildScrollView) {
-                ChildScrollView child = (ChildScrollView) childView;
-                if (child.mVelocityTracker != null) {
-                    final ViewConfiguration configuration = ViewConfiguration.get(getContext());
-                    child.mVelocityTracker.computeCurrentVelocity(1000, configuration.getScaledMaximumFlingVelocity());
-                    int initialVelocity = (int) VelocityTrackerCompat.getYVelocity(child.mVelocityTracker,
-                            child.mActivePointerId);
+//                ChildScrollView child = (ChildScrollView) childView;
+            if (childView.mVelocityTracker != null) {
+                final ViewConfiguration configuration = ViewConfiguration.get(getContext());
+                childView.mVelocityTracker.computeCurrentVelocity(1000, configuration.getScaledMaximumFlingVelocity());
+                int initialVelocity = (int) VelocityTrackerCompat.getYVelocity(childView.mVelocityTracker,
+                        childView.mActivePointerId);
 
-                    if ((Math.abs(initialVelocity) > child.mMinimumVelocity)) {
-                        //因为nestedScrolling的bug，所以在这里fling
-                        fling(-initialVelocity);
-                        LogUtil.fish("fling up");
-                        return false;
-                    }
+                if ((Math.abs(initialVelocity) > childView.mMinimumVelocity)) {
+                    //因为nestedScrolling的bug，所以在这里fling
+                    fling(-initialVelocity);
+                    LogUtil.fish("fling up");
+                    return false;
                 }
-                //此时，应该截获，调用fling
             }
+            //此时，应该截获，调用fling
 
         }
-        boolean b= super.onInterceptTouchEvent(ev);
-        LogUtil.fish("parent onInterceptTouchEvent="+b);
+        boolean b = super.onInterceptTouchEvent(ev);
+        LogUtil.fish("parent onInterceptTouchEvent=" + b);
         return b;
     }
 
     //fling不能把button给飞走,手指上滑，velocityY为正
     public void fling(int velocityY) {
-        LogUtil.fish("velocityY="+velocityY);
+        LogUtil.fish("velocityY=" + velocityY);
         if (getChildCount() > 0) {
             int height = getHeight() - getPaddingBottom() - getPaddingTop();
             int bottom = getChildAt(0).getHeight();
@@ -106,6 +105,7 @@ public class ParentScrollView extends MyNestedScrollView {
     protected void onFinishInflate() {
         super.onFinishInflate();
         topBtn = (Button) findViewById(R.id.btn);
+        childView = (ChildScrollView) findViewById(R.id.child);
     }
 
     @Override
@@ -113,6 +113,12 @@ public class ParentScrollView extends MyNestedScrollView {
         super.onLayout(changed, l, t, r, b);
         yBtn = (int) topBtn.getY();
         LogUtil.fish("yBtn=" + yBtn);
+        int unUsedHeight = getHeight() - topBtn.getHeight();
+        ViewGroup.LayoutParams parms = childView.getLayoutParams();
+        if (parms.height != unUsedHeight) {
+            parms.height = unUsedHeight;
+            childView.setLayoutParams(parms);
+        }
     }
 
 
@@ -120,9 +126,10 @@ public class ParentScrollView extends MyNestedScrollView {
     protected void onScrollChanged(int l, int t, int oldl, int oldt) {
         if (isBtnOnTop() && !mScroller.isFinished() && t > oldt) {
             //需要abort吗？
-            int v=(int) mScroller.getCurrVelocity();
+            //这里处理了往上fling
+            int v = (int) mScroller.getCurrVelocity();
             //这里的速度可以调整，如果直接用v太快了
-            v=v/2;
+            v = v / 2;
             LogUtil.fish("child Velocity=" + v);
             childView.fling(v);
 //            LogUtil.fish("get top");
@@ -137,7 +144,7 @@ public class ParentScrollView extends MyNestedScrollView {
     @Override
     public void onNestedScroll(View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed) {
         LogUtil.fish("parent onNestedScroll");
-//        super.onNestedScroll(target, dxConsumed, dyConsumed, dxUnconsumed, dyUnconsumed);
+        super.onNestedScroll(target, dxConsumed, dyConsumed, dxUnconsumed, dyUnconsumed);
     }
 
     @Override
@@ -148,5 +155,10 @@ public class ParentScrollView extends MyNestedScrollView {
     @Override
     boolean overScrollByCompat(int deltaX, int deltaY, int scrollX, int scrollY, int scrollRangeX, int scrollRangeY, int maxOverScrollX, int maxOverScrollY, boolean isTouchEvent) {
         return super.overScrollByCompat(deltaX, deltaY, scrollX, scrollY, scrollRangeX, scrollRangeY, maxOverScrollX, maxOverScrollY, isTouchEvent);
+    }
+
+    @Override
+    protected void onFlingToBottom(int currVelocity) {
+//        super.onFlingToBottom(currVelocity);
     }
 }
